@@ -1,0 +1,2720 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>健康APP UI/UX 设计</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+  function switchModule(module) {
+    // 隐藏所有模块
+    const modules = document.querySelectorAll('.main-module');
+    modules.forEach(m => m.classList.add('hidden'));
+    
+    // 显示选中的模块
+    const targetModule = document.getElementById(module + 'Module');
+    if (targetModule) {
+        targetModule.classList.remove('hidden');
+    }
+
+    // 更新导航按钮状态
+    const navButtons = document.querySelectorAll('nav.w-1/5 button');
+    navButtons.forEach(btn => {
+        btn.classList.remove('text-blue-500', 'text-indigo-500', 'text-pink-500', 'text-emerald-500', 'bg-blue-50', 'bg-indigo-50', 'bg-pink-50', 'bg-emerald-50');
+        btn.classList.add('text-gray-400');
+    });
+    
+    // 设置当前选中按钮的颜色
+    const activeBtn = document.querySelector(`nav.w-1/5 button[onclick*="${module}"]`);
+    if (activeBtn) {
+        switch(module) {
+            case 'exercise':
+                activeBtn.classList.add('text-blue-500', 'bg-blue-50');
+                break;
+            case 'sleep':
+                activeBtn.classList.add('text-indigo-500', 'bg-indigo-50');
+                break;
+            case 'period':
+                activeBtn.classList.add('text-pink-500', 'bg-pink-50');
+                break;
+            case 'profile':
+                activeBtn.classList.add('text-emerald-500', 'bg-emerald-50');
+                break;
+        }
+    }
+    
+    // 滚动到顶部
+    window.scrollTo(0, 0);
+  }
+  document.addEventListener('DOMContentLoaded', () => switchModule('exercise'));
+
+  function openSleepModal() {
+    document.getElementById('sleepModal').classList.remove('hidden');
+}
+
+function closeSleepModal() {
+    document.getElementById('sleepModal').classList.add('hidden');
+}
+
+function handleSleepSubmit(event) {
+    event.preventDefault();
+    
+    const sleepTime = document.getElementById('sleepTimeInput').value;
+    const wakeTime = document.getElementById('wakeTimeInput').value;
+    const quality = document.getElementById('qualitySelect').value;
+    
+    if (!sleepTime || !wakeTime) {
+        alert('请填写入睡和起床时间');
+        return;
+    }
+    
+    // 构造数据（日期自动取当前日期）
+    const sleepData = {
+        date: new Date().toISOString().split('T')[0],  // 格式：YYYY-MM-DD
+        sleepTime: sleepTime,
+        wakeTime: wakeTime,
+        quality: quality
+    };
+  
+    // 使用 fetch() 将数据以 JSON 格式 POST 到后端 /sleep/record 接口
+    fetch('http://localhost:5000/sleep/record', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(sleepData)
+    })
+    .then(response => response.json())
+    .then(result => {
+        console.log('后台返回：', result);
+        if(result.message){
+            alert(result.message);
+            // 提交成功后更新图表
+            const stageData = generateSleepStageData(sleepTime, wakeTime, quality);
+            updateSleepStageChart(stageData);
+            updateSleepDisplay();
+        } else {
+            alert(result.error);
+        }
+        // 提交成功后关闭弹窗
+        closeSleepModal();
+    })
+    .catch(error => {
+        console.error('请求错误：', error);
+        alert('保存时出现错误');
+    });
+}
+
+function openGoalModal() {
+    document.getElementById('goalModal').classList.remove('hidden');
+  }
+
+  function closeGoalModal() {
+    document.getElementById('goalModal').classList.add('hidden');
+  }
+
+  function saveGoal() {
+    const goal = document.querySelector('#goalModal input[type="number"]').value;
+    alert(`已设置目标步数为：${goal}`);
+    closeGoalModal();
+  }
+  
+  // 添加强度说明弹窗控制函数
+  function openIntensityModal() {
+    document.getElementById('intensityModal').classList.remove('hidden');
+  }
+
+  function closeIntensityModal() {
+    document.getElementById('intensityModal').classList.add('hidden');
+  }
+  
+  // 添加睡眠详细报告弹窗控制函数
+  function openSleepDetailModal() {
+    document.getElementById('sleepDetailModal').classList.remove('hidden');
+  }
+
+  function closeSleepDetailModal() {
+    document.getElementById('sleepDetailModal').classList.add('hidden');
+  }
+</script>
+</head>
+<body class="bg-gray-100 min-h-screen flex flex-col">
+<!-- 顶部导航栏 -->
+<nav class="fixed top-0 left-0 right-0 z-50 bg-white/80 backdrop-blur-md border-b border-gray-200">
+  <div class="max-w-full mx-auto px-4 sm:px-6 lg:px-8">
+    <div class="flex items-center justify-between h-14">
+      <!-- 居中：应用Logo -->
+      <div class="flex items-center justify-center w-full">
+        <img src="https://placehold.co/40x40" alt="Logo" class="h-8 w-8 rounded-full">
+        <span class="ml-2 text-xl font-semibold text-gray-800">健康助手</span>
+      </div>
+
+      <!-- 右侧：导航菜单 -->
+      <div class="flex items-center space-x-4">
+        <!-- 用户头像 -->
+        <div class="relative group">
+          <img src="https://placehold.co/40x40" alt="User Avatar" class="h-8 w-8 rounded-full cursor-pointer hover:ring-2 hover:ring-blue-500">
+          <!-- 用户菜单 -->
+          <div class="hidden group-hover:block absolute right-0 mt-2 w-48 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5">
+            <div class="py-1">
+              <a href="#" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">个人资料</a>
+              <a href="#" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">设置</a>
+              <a href="#" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">登出</a>
+            </div>
+          </div>
+        </div>
+
+        <!-- 通知图标 -->
+        <div class="relative">
+          <button class="p-1 text-gray-500 hover:text-gray-700 focus:outline-none">
+            <i class="fas fa-bell text-xl"></i>
+            <span class="absolute top-0 right-0 inline-block w-2 h-2 bg-red-500 rounded-full"></span>
+          </button>
+        </div>
+
+        <!-- 设置图标 -->
+        <button class="p-1 text-gray-500 hover:text-gray-700 focus:outline-none">
+          <i class="fas fa-cog text-xl"></i>
+        </button>
+      </div>
+    </div>
+  </div>
+</nav>
+
+<!-- 主体内容区 - 使用Flexbox布局 -->
+<div class="flex w-full min-h-screen pt-14">
+  <!-- 左侧导航栏 -->
+  <nav class="w-1/5 bg-white border-r border-gray-200 shadow-md fixed left-0 top-14 bottom-0 overflow-y-auto">
+    <div class="flex flex-col h-full p-4 space-y-8">
+      <!-- App Logo 和应用名称 -->
+      <div class="flex flex-col items-center justify-center py-4">
+        <img src="https://placehold.co/60x60" alt="Logo" class="h-16 w-16 rounded-full mb-2">
+        <span class="text-lg font-semibold text-gray-800">健康助手</span>
+      </div>
+      
+      <!-- 导航菜单 -->
+      <div class="flex flex-col space-y-4">
+        <button class="flex items-center p-3 rounded-xl text-gray-400 hover:bg-blue-50 hover:text-blue-500 transition-colors" onclick="switchModule('exercise')">
+          <i class="fas fa-running text-xl w-8"></i>
+          <span class="text-sm ml-2">运动记录</span>
+        </button>
+        <button class="flex items-center p-3 rounded-xl text-gray-400 hover:bg-indigo-50 hover:text-indigo-500 transition-colors" onclick="switchModule('sleep')">
+          <i class="fas fa-moon text-xl w-8"></i>
+          <span class="text-sm ml-2">睡眠分析</span>
+        </button>
+        <button class="flex items-center p-3 rounded-xl text-gray-400 hover:bg-pink-50 hover:text-pink-500 transition-colors" onclick="switchModule('period')">
+          <i class="fas fa-calendar-alt text-xl w-8"></i>
+          <span class="text-sm ml-2">经期记录</span>
+        </button>
+        <button class="flex items-center p-3 rounded-xl text-gray-400 hover:bg-emerald-50 hover:text-emerald-500 transition-colors" onclick="switchModule('profile')">
+          <i class="fas fa-user text-xl w-8"></i>
+          <span class="text-sm ml-2">个人主页</span>
+        </button>
+      </div>
+      
+      <!-- 底部链接 -->
+      <div class="mt-auto flex flex-col space-y-2 pt-8">
+        <button class="flex items-center p-3 rounded-xl text-gray-400 hover:bg-gray-100 transition-colors">
+          <i class="fas fa-cog text-xl w-8"></i>
+          <span class="text-sm ml-2">设置</span>
+        </button>
+        <button class="flex items-center p-3 rounded-xl text-gray-400 hover:bg-gray-100 transition-colors">
+          <i class="fas fa-question-circle text-xl w-8"></i>
+          <span class="text-sm ml-2">帮助中心</span>
+        </button>
+      </div>
+    </div>
+  </nav>
+
+  <!-- 右侧内容区 -->
+  <div class="w-4/5 ml-[20%] overflow-y-auto">
+    <!-- 设计预览区域 -->
+    <div class="p-6">
+    
+ <!-- 运动记录主页面 -->
+<div id="exerciseModule" class="main-module w-full min-h-[calc(100vh-3.5rem)] bg-white rounded-3xl shadow-lg p-6 md:p-8 lg:p-10 relative overflow-hidden">
+    <!-- 头部区域 -->
+    <div class="flex justify-between items-center mb-6">
+        <div>
+            <h2 class="text-2xl font-bold text-gray-800">今日运动</h2>
+            <p class="text-gray-500 text-sm">2024年3月21日</p>
+        </div>
+        <button onclick="openExerciseModal()" class="w-10 h-10 bg-blue-500 rounded-full flex items-center justify-center text-white shadow-lg hover:bg-blue-600 transition-colors">
+            <i class="fas fa-plus"></i>
+        </button>
+    </div>
+
+    <!-- 核心数据区 -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- 主要指标卡片 -->
+        <div class="lg:col-span-2 bg-blue-50 rounded-2xl p-6">
+            <div class="grid grid-cols-3 gap-4">
+                <div class="text-center">
+                    <div class="text-4xl font-bold text-blue-600 mb-2">8,547</div>
+                    <div class="text-sm text-gray-600">今日步数</div>
+                    <div class="mt-3 h-1 bg-blue-200 rounded-full">
+                        <div class="w-3/4 h-full bg-blue-500 rounded-full"></div>
+                    </div>
+                </div>
+                <div class="text-center border-x border-blue-100">
+                    <div class="text-4xl font-bold text-blue-600 mb-2">6.4</div>
+                    <div class="text-sm text-gray-600">公里</div>
+                    <div class="mt-3 flex justify-center items-center gap-1">
+                        <i class="fas fa-shoe-prints text-blue-400"></i>
+                        <span class="text-xs text-blue-600">平均步频 112步/分钟</span>
+                    </div>
+                </div>
+                <div class="text-center">
+                    <div class="text-4xl font-bold text-blue-600 mb-2">427</div>
+                    <div class="text-sm text-gray-600">卡路里</div>
+                    <div class="mt-3 text-xs text-blue-500">
+                        ≈ {燃烧脂肪时长 45分钟}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 运动强度卡片 -->
+        <div class="bg-white rounded-2xl p-6 border border-blue-100">
+            <div class="flex flex-col h-full justify-between">
+                <div class="text-center">
+                    <div class="text-xl font-semibold text-blue-600">中等强度运动</div>
+                    <div class="text-sm text-gray-500 mt-1">当前运动强度</div>
+                </div>
+                <div class="mt-4 relative">
+                    <div class="h-2 bg-blue-200 rounded-full">
+                        <div class="w-2/3 h-full bg-blue-500 rounded-full"></div>
+                    </div>
+                    <div class="flex justify-between text-xs text-blue-600 mt-2">
+                        <span>低</span>
+                        <span>中</span>
+                        <span>高</span>
+                    </div>
+                </div>
+                <button class="mt-4 text-blue-500 hover:text-blue-600 text-sm flex items-center justify-center gap-1" onclick="openIntensityModal()">
+                    <i class="fas fa-info-circle"></i>
+                    <span>强度说明</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+        <!-- 周数据柱状图 -->
+        <div class="grid grid-cols-2 gap-4 mt-6">
+            <div class="rounded-2xl p-4">
+                <div class="flex justify-between items-center mb-4"><h3 class="text-gray-700 font-semibold">运动趋势</h3><div class="flex space-x-2"><button class="text-sm text-gray-500 hover:text-blue-500 px-2 py-1 rounded-lg" onclick="switchChartView('week')">本周</button><button class="text-sm text-gray-500 hover:text-blue-500 px-2 py-1 rounded-lg" onclick="switchChartView('month')">本月</button><button class="text-sm text-gray-500 hover:text-blue-500 px-2 py-1 rounded-lg" onclick="switchChartView('year')">年度</button></div></div>
+                <div class="flex justify-between items-end h-32">
+                    <div class="flex flex-col items-center">
+                        <div class="h-20 w-8 bg-blue-200 rounded-t-lg"></div>
+                        <span class="text-xs text-gray-500 mt-2">一</span>
+                    </div>
+                    <div class="flex flex-col items-center">
+                        <div class="h-24 w-8 bg-blue-300 rounded-t-lg"></div>
+                        <span class="text-xs text-gray-500 mt-2">二</span>
+                    </div>
+                    <div class="flex flex-col items-center">
+                        <div class="h-16 w-8 bg-blue-200 rounded-t-lg"></div>
+                        <span class="text-xs text-gray-500 mt-2">三</span>
+                    </div>
+                    <div class="flex flex-col items-center">
+                        <div class="h-28 w-8 bg-blue-500 rounded-t-lg"></div>
+                        <span class="text-xs text-gray-500 mt-2">四</span>
+                    </div>
+                    <div class="flex flex-col items-center">
+                        <div class="h-12 w-8 bg-blue-200 rounded-t-lg"></div>
+                        <span class="text-xs text-gray-500 mt-2">五</span>
+                    </div>
+                    <div class="flex flex-col items-center">
+                        <div class="h-20 w-8 bg-blue-200 rounded-t-lg"></div>
+                        <span class="text-xs text-gray-500 mt-2">六</span>
+                    </div>
+                    <div class="flex flex-col items-center">
+                        <div class="h-16 w-8 bg-blue-200 rounded-t-lg"></div>
+                        <span class="text-xs text-gray-500 mt-2">日</span>
+                    </div>
+                </div>
+            </div>
+            <div class="rounded-2xl p-4">
+                <h3 class="text-xl font-bold text-blue-600 mb-4">今日步数目标</h3>
+                <div class="space-y-4">
+                    <div class="text-center">
+                        <div class="text-4xl font-bold text-blue-600 mb-2 bg-blue-100 p-4 rounded-lg">10,000</div>
+                        <div class="text-sm text-gray-500 text-center">已完成 85%</div>
+                        <button onclick="openGoalModal()" class="w-full py-2 rounded-xl bg-grey-100 text-blue-600 font-medium hover:bg-blue-200 text-sm">
+                            修改目标
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+       
+    </div>
+
+    <!-- 数据录入弹窗 -->
+    <div id="exerciseModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div class="w-full max-w-[500px] h-[500px] bg-white rounded-2xl p-4 shadow-lg overflow-y-auto">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-lg font-bold text-gray-800">记录运动</h3>
+                <button onclick="closeExerciseModal()" class="text-gray-500 hover:text-gray-700">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+
+            <form id="exerciseForm" class="space-y-2">
+                <!-- 步数输入 -->
+                <div>
+                    <label class="block text-gray-700 text-sm font-medium mb-1">
+                        今日步数 <span class="text-blue-500">*</span>
+                    </label>
+                    <input 
+                        type="number" 
+                        id="stepsInput"
+                        class="w-full px-3 py-2 rounded-lg border focus:border-blue-500 focus:ring-1 focus:ring-blue-200"
+                        placeholder="请输入步数"
+                        required
+                    >
+                </div>
+                <div>
+                    <label class="block text-gray-700 text-sm font-medium mb-1">
+                        步长（厘米） <span class="text-blue-500">*</span>
+                    </label>
+                    <input 
+                        type="number" 
+                        id="strideLength"
+                        class="w-full px-3 py-2 rounded-lg border focus:border-blue-500 focus:ring-1 focus:ring-blue-200"
+                        placeholder="请输入步长"
+                        required
+                        min="50"
+                        max="100"
+                    >
+                </div>
+                <div>
+                    <label class="block text-gray-700 text-sm font-medium mb-1">
+                        体重（公斤） <span class="text-blue-500">*</span>
+                    </label>
+                    <input 
+                        type="number" 
+                        id="weightInput"
+                        class="w-full px-3 py-2 rounded-lg border focus:border-blue-500 focus:ring-1 focus:ring-blue-200"
+                        placeholder="请输入体重"
+                        required
+                        min="30"
+                        max="200"
+                    >
+                </div>
+                <div>
+                    <label class="block text-gray-700 text-sm font-medium mb-1">
+                        运动强度
+                    </label>
+                    <select 
+                        id="intensitySelect"
+                        class="w-full px-3 py-2 rounded-lg border focus:border-blue-500 focus:ring-1 focus:ring-blue-200"
+                    >
+                        <option value="low">低强度</option>
+                        <option value="medium">中等强度</option>
+                        <option value="high">高强度</option>
+                    </select>
+                </div>
+
+                <!-- 运动类型 -->
+                <div>
+                    <label class="block text-gray-700 text-sm font-medium mb-1">
+                        运动类型
+                    </label>
+                    <div class="grid grid-cols-2 gap-2">
+                        <label class="flex items-center space-x-2 p-2 rounded-lg border border-gray-200 hover:bg-blue-50 text-sm">
+                            <input type="checkbox" name="exerciseType" value="walking">
+                            <span>步行</span>
+                        </label>
+                        <label class="flex items-center space-x-2 p-2 rounded-lg border border-gray-200 hover:bg-blue-50 text-sm">
+                            <input type="checkbox" name="exerciseType" value="running">
+                            <span>跑步</span>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- 提交按钮 -->
+                <div class="flex space-x-3 pt-2">
+                    <button type="button" onclick="closeExerciseModal()" class="flex-1 py-2 rounded-xl border border-blue-500 text-blue-500 font-medium hover:bg-blue-50">
+                        取消
+                    </button>
+                    <button type="button" onclick="handleExerciseSubmit(event)" class="flex-1 py-2 rounded-xl bg-blue-500 text-white font-medium hover:bg-blue-600">
+                        保存
+                    </button>
+                </div>
+            </form>
+        </div>
+        
+    </div>
+
+   
+
+    <!-- 运动目标设置弹窗 -->
+    <div id="goalModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div class="w-full max-w-[500px] bg-white rounded-2xl p-6 shadow-lg">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-lg font-bold text-gray-800">设置运动目标</h3>
+                <button onclick="closeGoalModal()" class="text-gray-500 hover:text-gray-700">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-gray-700 text-sm font-medium mb-2">目标步数</label>
+                    <input 
+                        type="number" 
+                        min="1000" 
+                        max="50000" 
+                        step="1000"
+                        value="10000"
+                        class="w-full px-4 py-2 rounded-lg border border-gray-300 focus:border-blue-500 focus:ring-1 focus:ring-blue-200" 
+                        placeholder="请输入目标步数"
+                        oninput="this.value = Math.max(1000, Math.min(50000, Math.floor(this.value/1000)*1000))"
+                    >
+                    <p class="text-sm text-gray-500 mt-1">建议设置范围：1,000 - 50,000步</p>
+                </div>
+
+                <div class="flex space-x-3">
+                    <button onclick="closeGoalModal()" class="flex-1 py-2 rounded-xl border border-blue-500 text-blue-500 font-medium hover:bg-blue-50">
+                        取消
+                    </button>
+                    <button onclick="saveGoal()" class="flex-1 py-2 rounded-xl bg-blue-500 text-white font-medium hover:bg-blue-600">
+                        确定
+                    </button>
+                </div>
+            </div>
+        </div>
+        
+    </div>
+
+ <!-- 睡眠分析主页面 -->
+<div id="sleepModule" class="main-module hidden w-full min-h-[calc(100vh-3.5rem)] bg-white rounded-3xl shadow-lg p-6 md:p-8 lg:p-10 relative overflow-hidden space-y-6">
+    <!-- 顶部标题保持不变 -->
+    <div class="flex justify-between items-center">
+        <div>
+            <h2 class="text-2xl font-bold text-gray-800">睡眠分析</h2>
+            <p class="text-gray-500 text-sm current-date"></p>
+        </div>
+        <button onclick="openSleepModal()" 
+                class="w-10 h-10 bg-indigo-500 rounded-full flex items-center justify-center text-white shadow-lg hover:bg-indigo-600 cursor-pointer transition-colors">
+            <i class="fas fa-plus"></i>
+        </button>
+    </div>
+
+    <!-- 核心数据区改为2列布局 -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <!-- 左侧主数据列 -->
+        <div class="space-y-6">
+            <!-- 睡眠评分卡片优化 -->
+            <div class="bg-indigo-50 rounded-2xl p-6">
+                <div class="flex flex-col items-center">
+                    <div class="relative w-32 h-32 mb-4">
+                        <!-- 新增动画效果 -->
+                        <div class="absolute inset-0 rounded-full border-8 border-indigo-100 animate-pulse"></div>
+                        <div class="absolute inset-0 rounded-full border-8 border-indigo-500 border-t-transparent transform -rotate-45"></div>
+                        <div class="absolute inset-0 flex items-center justify-center">
+                            <div class="text-center">
+                                <div class="text-3xl font-bold text-indigo-600">85</div>
+                                <div class="text-sm text-gray-500">良好</div>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- 新增呼吸质量指标 -->
+                    <div class="w-full grid grid-cols-4 gap-4 mt-4">
+                        <div class="text-center">
+                            <div class="text-lg font-semibold text-indigo-600">7h 30m</div>
+                            <div class="text-xs text-gray-500">总时长</div>
+                        </div>
+                        <div class="text-center">
+                            <div class="text-lg font-semibold text-indigo-600">23:30</div>
+                            <div class="text-xs text-gray-500">入睡时间</div>
+                        </div>
+                        <div class="text-center">
+                            <div class="text-lg font-semibold text-indigo-600">07:00</div>
+                            <div class="text-xs text-gray-500">醒来时间</div>
+                        </div>
+                        <div class="text-center">
+                            <div class="text-lg font-semibold text-indigo-600">92%</div>
+                            <div class="text-xs text-gray-500">呼吸质量</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 新增周趋势模块 -->
+            <div class="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
+                <h3 class="text-gray-700 font-semibold mb-4">本周睡眠趋势</h3>
+                <div class="flex items-end justify-between h-32">
+                    <div class="flex-1 mx-1 bg-indigo-100 rounded-t-lg" style="height:30%"></div>
+                    <div class="flex-1 mx-1 bg-indigo-200 rounded-t-lg" style="height:50%"></div>
+                    <div class="flex-1 mx-1 bg-indigo-300 rounded-t-lg" style="height:70%"></div>
+                    <div class="flex-1 mx-1 bg-indigo-400 rounded-t-lg" style="height:90%"></div>
+                    <div class="flex-1 mx-1 bg-indigo-300 rounded-t-lg" style="height:60%"></div>
+                    <div class="flex-1 mx-1 bg-indigo-200 rounded-t-lg" style="height:40%"></div>
+                    <div class="flex-1 mx-1 bg-indigo-100 rounded-t-lg" style="height:20%"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 右侧辅助数据列 -->
+        <div class="space-y-6">
+            <!-- 优化后的睡眠阶段分析 -->
+            <div class="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-gray-700 font-semibold">睡眠阶段</h3>
+                    <button onclick="openSleepDetailModal()" class="text-indigo-500 text-sm flex items-center gap-1">
+                        <span>详细报告</span>
+                        <i class="fas fa-chevron-right text-xs"></i>
+                    </button>
+                </div>
+                <div class="h-48 relative">
+                    <canvas id="sleepStageChart"></canvas>
+                </div>
+                <div class="mt-4 grid grid-cols-3 gap-2 text-center">
+                    <div class="text-xs">
+                        <div class="font-medium text-indigo-600" id="deepSleepTime">3h</div>
+                        <div class="text-gray-500">深度睡眠</div>
+                    </div>
+                    <div class="text-xs">
+                        <div class="font-medium text-indigo-400" id="lightSleepTime">3.5h</div>
+                        <div class="text-gray-500">浅度睡眠</div>
+                    </div>
+                    <div class="text-xs">
+                        <div class="font-medium text-gray-400" id="awakeTime">1h</div>
+                        <div class="text-gray-500">清醒</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 新增环境数据卡片 -->
+            <div class="bg-indigo-50 rounded-2xl p-6">
+                <h3 class="text-lg font-semibold text-gray-800 mb-4">睡眠环境</h3>
+                <div class="grid grid-cols-2 gap-4">
+                    <div class="flex items-center gap-3">
+                        <div class="w-8 h-8 bg-indigo-100 rounded-lg flex items-center justify-center">
+                            <i class="fas fa-thermometer-half text-indigo-600"></i>
+                        </div>
+                        <div>
+                            <div class="text-sm font-medium">22.5°C</div>
+                            <div class="text-xs text-gray-500">室温</div>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-3">
+                        <div class="w-8 h-8 bg-indigo-100 rounded-lg flex items-center justify-center">
+                            <i class="fas fa-volume-off text-indigo-600"></i>
+                        </div>
+                        <div>
+                            <div class="text-sm font-medium">32dB</div>
+                            <div class="text-xs text-gray-500">噪音</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 底部建议模块优化 -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <!-- 原有睡眠建议 -->
+        <div class="bg-indigo-50 rounded-2xl p-6">
+            <h3 class="text-lg font-semibold text-gray-800 mb-4">个性化建议</h3>
+            <div class="text-sm text-gray-600 space-y-3">
+                <div class="flex items-center gap-2">
+                    <i class="fas fa-leaf text-indigo-500"></i>
+                    <span>保持卧室温度18-22°C</span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <i class="fas fa-ear-deaf text-indigo-500"></i>
+                    <span>使用耳塞降低噪音</span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <i class="fas fa-moon text-indigo-500"></i>
+                    <span>保持卧室光线昏暗</span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <i class="fas fa-bed text-indigo-500"></i>
+                    <span>尝试提前30分钟上床</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- 新增心率监测 -->
+        <div class="bg-indigo-50 rounded-2xl p-6">
+            <h3 class="text-lg font-semibold text-gray-800 mb-4">夜间心率</h3>
+            <div class="flex items-center justify-between">
+                <div class="text-3xl font-bold text-indigo-600">58</div>
+                <div class="text-sm text-gray-500">平均bpm</div>
+            </div>
+            <div class="h-20 mt-4 bg-white rounded-lg p-2">
+                <div class="flex items-end h-full gap-px">
+                    <!-- 示例心率波形 -->
+                    <div class="w-2 bg-indigo-100" style="height:30%"></div>
+                    <div class="w-2 bg-indigo-200" style="height:50%"></div>
+                    <div class="w-2 bg-indigo-300" style="height:70%"></div>
+                    <!-- 更多波形条... -->
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+
+ <!-- 经期记录主页面 -->
+<div id="periodModule" class="main-module hidden w-full min-h-[calc(100vh-3.5rem)] bg-white rounded-3xl shadow-lg p-6 md:p-8 lg:p-10 relative overflow-hidden">
+    <!-- 头部区域 -->
+    <div class="flex justify-between items-center mb-6">
+        <div>
+            <h2 class="text-2xl font-bold text-gray-800">经期记录</h2>
+            <p class="text-gray-500 text-sm" id="currentDate"></p>
+        </div>
+        <button onclick="openPeriodModal()" class="w-10 h-10 bg-pink-500 rounded-full flex items-center justify-center text-white shadow-lg hover:bg-pink-600 transition-colors">
+            <i class="fas fa-plus"></i>
+        </button>
+    </div>
+
+    <!-- 顶部双卡片布局 -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+        <!-- 原有经期预测卡片 -->
+        <div class="bg-pink-50 rounded-2xl p-4 border border-pink-100">
+            <div class="flex justify-between items-start mb-4">
+                <div>
+                    <h3 class="font-medium text-gray-800">下次经期预测</h3>
+                    <p class="text-pink-600 text-sm mt-1">平均周期28天</p>
+                </div>
+                <span class="bg-white text-pink-500 text-xs px-3 py-1 rounded-full font-medium shadow-sm">
+                    还有12天
+                </span>
+            </div>
+            <div class="w-full h-2 bg-pink-100 rounded-full mt-4">
+                <div class="w-[60%] h-full bg-pink-300 rounded-full"></div>
+            </div>
+            <div class="flex justify-between mt-2 text-sm text-gray-600">
+                <span>上次：3月9日</span>
+                <span>预测：4月2日</span>
+            </div>
+        </div>
+
+        <!-- 新增周期统计卡片 -->
+        <div class="bg-pink-50 rounded-2xl p-4 border border-pink-100">
+            <div class="flex justify-between items-start mb-4">
+                <div>
+                    <h3 class="font-medium text-gray-800">周期统计</h3>
+                    <p class="text-pink-600 text-sm mt-1">最近6个周期</p>
+                </div>
+                <i class="fas fa-chart-pie text-pink-400"></i>
+            </div>
+            <div class="grid grid-cols-3 gap-4 text-center">
+                <div>
+                    <p class="text-xs text-gray-600 mb-1">平均周期</p>
+                    <p class="text-lg font-bold text-pink-600">28天</p>
+                </div>
+                <div>
+                    <p class="text-xs text-gray-600 mb-1">平均经期</p>
+                    <p class="text-lg font-bold text-pink-600">5天</p>
+                </div>
+                <div>
+                    <p class="text-xs text-gray-600 mb-1">规律性</p>
+                    <p class="text-lg font-bold text-pink-600">92%</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 中间双列布局 -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+    
+
+        <!-- 新增用药提醒卡片 -->
+        <div class="bg-pink-50 rounded-2xl p-4 border border-pink-100">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-gray-700 font-medium">用药提醒</h3>
+                <button class="w-8 h-8 bg-pink-100 rounded-full flex items-center justify-center text-pink-500 hover:bg-pink-200">
+                    <i class="fas fa-plus text-sm"></i>
+                </button>
+            </div>
+            <div class="space-y-3">
+                <div class="bg-white rounded-lg p-3 shadow-sm">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <div class="text-sm text-pink-600">布洛芬缓释胶囊</div>
+                            <div class="text-xs text-gray-500 mt-1">下次：14:00</div>
+                        </div>
+                        <i class="fas fa-bell text-pink-400"></i>
+                    </div>
+                </div>
+                <div class="text-center text-pink-500 text-sm py-2 hover:bg-pink-100 rounded-lg cursor-pointer">
+                    + 添加新提醒
+                </div>
+            </div>
+        </div>
+
+        <!-- 健康建议 -->
+        <div class="bg-pink-50 rounded-2xl p-6">
+            <h3 class="text-xl font-bold text-pink-600 mb-4">健康建议</h3>
+            <div class="space-y-3">
+                <div class="flex items-start">
+                    <i class="fas fa-check text-pink-500 mt-1 mr-2"></i>
+                    <div class="text-gray-700 text-sm">保持充足睡眠，每天至少7-8小时</div>
+                </div>
+                <div class="flex items-start">
+                    <i class="fas fa-check text-pink-500 mt-1 mr-2"></i>
+                    <div class="text-gray-700 text-sm">适量运动，如瑜伽或散步</div>
+                </div>
+                <div class="flex items-start">
+                    <i class="fas fa-check text-pink-500 mt-1 mr-2"></i>
+                    <div class="text-gray-700 text-sm">保持均衡饮食，补充铁元素</div>
+                </div>
+            </div>
+    
+    </div>
+    </div>
+<div>
+        <!-- 日历主体 -->
+        <div class="w-full max-w-[1200px] min-h-[600px] bg-white rounded-3xl shadow-lg p-6 md:p-8 lg:p-10 relative overflow-hidden mx-auto">
+            <!-- 月份导航 -->
+            <div class="flex justify-between items-center mb-6">
+                <button onclick="changeMonth(-1)" class="p-2 hover:bg-gray-100 rounded-lg">
+                    <i class="fas fa-chevron-left text-gray-600"></i>
+                </button>
+                <h3 class="text-xl font-bold text-gray-800" id="currentMonthLabel">2024年3月</h3>
+                <button onclick="changeMonth(1)" class="p-2 hover:bg-gray-100 rounded-lg">
+                    <i class="fas fa-chevron-right text-gray-600"></i>
+                </button>
+            </div>
+
+            <!-- 星期表头 -->
+            <div class="grid grid-cols-7 mb-4">
+                <div class="text-center text-gray-500">日</div>
+                <div class="text-center text-gray-500">一</div>
+                <div class="text-center text-gray-500">二</div>
+                <div class="text-center text-gray-500">三</div>
+                <div class="text-center text-gray-500">四</div>
+                <div class="text-center text-gray-500">五</div>
+                <div class="text-center text-gray-500">六</div>
+            </div>
+
+            <!-- 日期网格 -->
+            <div id="calendarGrid" class="grid grid-cols-7 gap-2"></div>
+        </div>
+
+     
+        </div>
+</div>
+
+<!-- 弹窗部分保持原有代码不变 -->
+
+    <!-- 经期记录弹窗 -->
+    <div id="periodModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div class="w-[600px] bg-white rounded-[2rem] p-6 shadow-lg max-h-[90vh] overflow-y-auto">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-lg font-bold text-gray-800">记录经期</h3>
+                <button onclick="closePeriodModal()" class="text-gray-500 hover:text-gray-700">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+
+            <form id="periodForm" class="space-y-4">
+                <!-- 日期选择 -->
+                <div class="space-y-3">
+                    <div>
+                        <label class="block text-gray-700 text-sm font-medium mb-1">
+                            开始日期 <span class="text-pink-500">*</span>
+                        </label>
+                        <input 
+                            type="date" 
+                            id="periodStartDate"
+                            class="w-full px-3 py-2 rounded-lg border focus:border-pink-500 focus:ring-1 focus:ring-pink-200"
+                            required
+                        >
+                    </div>
+                    <div>
+                        <label class="block text-gray-700 text-sm font-medium mb-1">
+                            结束日期
+                        </label>
+                        <input 
+                            type="date" 
+                            id="periodEndDate"
+                            class="w-full px-3 py-2 rounded-lg border focus:border-pink-500 focus:ring-1 focus:ring-pink-200"
+                        >
+                    </div>
+                </div>
+
+                <!-- 经期状态 -->
+                <div>
+                    <label class="block text-gray-700 text-sm font-medium mb-1">
+                        出血量 <span class="text-pink-500">*</span>
+                    </label>
+                    <div class="flex justify-between space-x-2">
+                        <button type="button" onclick="selectFlow(this, 'light')" class="flow-btn flex-1 py-2 rounded-lg border border-gray-200 text-sm hover:bg-pink-50">
+                            少量
+                        </button>
+                        <button type="button" onclick="selectFlow(this, 'medium')" class="flow-btn flex-1 py-2 rounded-lg border border-gray-200 text-sm hover:bg-pink-50">
+                            中等
+                        </button>
+                        <button type="button" onclick="selectFlow(this, 'heavy')" class="flow-btn flex-1 py-2 rounded-lg border border-gray-200 text-sm hover:bg-pink-50">
+                            较多
+                        </button>
+                    </div>
+                    <input type="hidden" id="selectedFlow" value="">
+                </div>
+
+                <!-- 症状选择 -->
+                <div>
+                    <label class="block text-gray-700 text-sm font-medium mb-2">
+                        症状（可多选）
+                    </label>
+                    <div class="grid grid-cols-2 gap-2">
+                        <label class="flex items-center space-x-2 p-2 rounded-lg border border-gray-200 hover:bg-pink-50 text-sm">
+                            <input type="checkbox" name="symptoms" value="cramps">
+                            <span>痛经</span>
+                        </label>
+                        <label class="flex items-center space-x-2 p-2 rounded-lg border border-gray-200 hover:bg-pink-50 text-sm">
+                            <input type="checkbox" name="symptoms" value="headache">
+                            <span>头痛</span>
+                        </label>
+                        <label class="flex items-center space-x-2 p-2 rounded-lg border border-gray-200 hover:bg-pink-50 text-sm">
+                            <input type="checkbox" name="symptoms" value="breast_tenderness">
+                            <span>乳房胀痛</span>
+                        </label>
+                        <label class="flex items-center space-x-2 p-2 rounded-lg border border-gray-200 hover:bg-pink-50 text-sm">
+                            <input type="checkbox" name="symptoms" value="fatigue">
+                            <span>疲劳</span>
+                        </label>
+                        <label class="flex items-center space-x-2 p-2 rounded-lg border border-gray-200 hover:bg-pink-50 text-sm">
+                            <input type="checkbox" name="symptoms" value="mood_swings">
+                            <span>情绪波动</span>
+                        </label>
+                        <label class="flex items-center space-x-2 p-2 rounded-lg border border-gray-200 hover:bg-pink-50 text-sm">
+                            <input type="checkbox" name="symptoms" value="bloating">
+                            <span>腹胀</span>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- 心情记录 -->
+                <div>
+                    <label class="block text-gray-700 text-sm font-medium mb-2">
+                        今日心情
+                    </label>
+                    <div class="flex justify-between">
+                        <button type="button" onclick="selectMood(this, 'bad')" class="mood-btn p-2 rounded-lg border border-gray-200 hover:bg-pink-50">😫</button>
+                        <button type="button" onclick="selectMood(this, 'poor')" class="mood-btn p-2 rounded-lg border border-gray-200 hover:bg-pink-50">😔</button>
+                        <button type="button" onclick="selectMood(this, 'normal')" class="mood-btn p-2 rounded-lg border border-gray-200 hover:bg-pink-50">😐</button>
+                        <button type="button" onclick="selectMood(this, 'good')" class="mood-btn p-2 rounded-lg border border-gray-200 hover:bg-pink-50">😊</button>
+                        <button type="button" onclick="selectMood(this, 'great')" class="mood-btn p-2 rounded-lg border border-gray-200 hover:bg-pink-50">😃</button>
+                    </div>
+                    <input type="hidden" id="selectedMood" value="">
+                </div>
+
+                <!-- 备注 -->
+                <div>
+                    <label class="block text-gray-700 text-sm font-medium mb-1">
+                        备注
+                    </label>
+                    <textarea 
+                        id="periodNotes"
+                        class="w-full px-3 py-2 rounded-lg border focus:border-pink-500 focus:ring-1 focus:ring-pink-200"
+                        rows="2"
+                        placeholder="记录其他症状或感受..."
+                    ></textarea>
+                </div>
+
+                <!-- 提交按钮 -->
+                <div class="flex space-x-3 pt-2">
+                    <button type="button" onclick="closePeriodModal()" class="flex-1 py-2 rounded-xl border border-pink-500 text-pink-500 font-medium hover:bg-pink-50">
+                        取消
+                    </button>
+                    <button type="button" onclick="handlePeriodSubmit(event)" class="flex-1 py-2 rounded-xl bg-pink-500 text-white font-medium hover:bg-pink-600">
+                        保存
+                    </button>
+                </div>
+            </form>
+        </div>
+        
+    </div>
+
+    <!-- 历史记录详情弹窗 -->
+    <div id="historyModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div class="w-80 bg-white rounded-3xl p-6 max-h-[80vh] overflow-y-auto">
+            <div class="flex justify-between items-center mb-6">
+                <h3 class="text-xl font-bold text-gray-800">经期历史记录</h3>
+                <button onclick="closeHistoryModal()" class="text-gray-500">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+
+            <div class="space-y-4" id="historyList">
+                <!-- 历史记录将通过JavaScript动态填充 -->
+            </div>
+        </div>
+        
+    </div>
+
+    <!-- 日期详情弹窗 -->
+    <div id="dayDetailModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div class="w-80 bg-white rounded-3xl p-6">
+            <!-- 弹窗标题和关闭按钮 -->
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-xl font-bold text-gray-800" id="modalDate"></h3>
+                <button onclick="closeModal('dayDetailModal')" class="text-gray-500 hover:text-gray-700">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+
+            <!-- 心情记录 -->
+            <div class="bg-pink-50 rounded-xl p-4 mb-4">
+                <div class="flex justify-between items-center mb-2">
+                    <h4 class="text-gray-700 font-medium">今日心情</h4>
+                    <button onclick="openMoodPicker()" class="text-pink-500 hover:text-pink-600">
+                        <i class="fas fa-edit"></i>
+                    </button>
+                </div>
+                <div id="currentMood" class="flex items-center space-x-2">
+                    <span class="text-2xl">😐</span>
+                    <span class="text-sm text-gray-500">暂无记录</span>
+                </div>
+            </div>
+
+            <!-- 经期状态 -->
+            <div class="bg-pink-50 rounded-xl p-4">
+                <h4 class="text-gray-700 font-medium mb-2">经期状态</h4>
+                <div id="periodStatus" class="text-sm text-gray-600">
+                    暂无记录
+                </div>
+            </div>
+        </div>
+        
+    </div>
+
+    <!-- 心情选择弹窗 -->
+    <div id="moodPickerModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div class="w-80 bg-white rounded-3xl p-6">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-xl font-bold text-gray-800">选择心情</h3>
+                <button onclick="closeModal('moodPickerModal')" class="text-gray-500 hover:text-gray-700">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="grid grid-cols-4 gap-4" id="moodGrid"></div>
+        </div>
+        
+    </div>
+
+        <!-- 个人主页模块 - 健康数据仪表盘 -->
+<div id="profileModule" class="main-module hidden w-full min-h-[calc(100vh-3.5rem)] bg-white rounded-3xl shadow-lg p-6 md:p-8 lg:p-10 relative overflow-hidden">
+
+    <!-- 头部信息区 -->
+    <section class="mb-10 relative">
+      <!-- 渐变背景层 -->
+      <div class="absolute inset-0 bg-gradient-to-r from-emerald-50 to-cyan-50 opacity-50 rounded-2xl -m-4"></div>
+      
+      <!-- 用户身份区 -->
+      <div class="relative flex flex-col md:flex-row items-center gap-6">
+        <!-- 动态头像 -->
+        <div class="relative group">
+          <div class="absolute inset-0 rounded-full bg-gradient-to-br from-emerald-400 to-cyan-400 blur-lg opacity-30 group-hover:opacity-50 transition-opacity"></div>
+          <div class="relative">
+            <img src="https://placehold.co/120x120" alt="用户头像" 
+                 class="w-24 h-24 rounded-full border-4 border-white/80 shadow-lg transition-transform duration-300 hover:scale-105">
+            <!-- 相机按钮 -->
+            <button class="absolute -bottom-2 -right-2 bg-white rounded-full p-2 shadow-lg hover:shadow-xl transition-all
+                          border-2 border-emerald-100 hover:border-emerald-200">
+              <i class="fas fa-camera text-emerald-600 text-sm w-6 h-6 flex items-center justify-center"></i>
+            </button>
+          </div>
+        </div>
+  
+        <!-- 用户信息 -->
+        <div class="text-center md:text-left space-y-1">
+          <h1 class="text-2xl font-bold text-gray-800 flex items-center gap-2 justify-center md:justify-start">
+            Jane Cooper
+            <span class="text-emerald-500 text-lg">
+              <i class="fas fa-badge-check"></i>
+            </span>
+          </h1>
+          <p class="text-gray-500">健康达人 · 连续打卡127天</p>
+          <div class="flex items-center gap-2 text-sm text-gray-500 justify-center md:justify-start">
+            <i class="fas fa-location-dot"></i>
+            <span>上海 · 28岁</span>
+          </div>
+        </div>
+      </div>
+    </section>
+  
+    <!-- 核心健康指标 -->
+    <section class="mb-10">
+      <!-- 指标导航 -->
+      <div class="flex items-center justify-between mb-6 px-2">
+        <h2 class="text-xl font-bold text-gray-800">今日健康数据</h2>
+        <div class="flex gap-2">
+          <button class="text-emerald-600 hover:text-emerald-700 flex items-center gap-1">
+            <span>本周趋势</span>
+            <i class="fas fa-chart-line text-sm"></i>
+          </button>
+        </div>
+      </div>
+  
+      <!-- 指标卡片组 -->
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <!-- 动态步数卡片 -->
+        <div class="bg-gradient-to-br from-blue-50 to-emerald-50 rounded-2xl p-5 relative overflow-hidden">
+          <div class="absolute top-0 right-0 w-24 h-24 bg-cyan-100/30 rounded-bl-full"></div>
+          <div class="relative">
+            <div class="flex items-center gap-3 mb-4">
+              <div class="w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center text-white">
+                <i class="fas fa-walking"></i>
+              </div>
+              <h3 class="font-semibold text-gray-700">运动数据</h3>
+            </div>
+            <div class="space-y-3">
+              <div class="flex justify-between items-center">
+                <span class="text-gray-600 text-sm">今日步数</span>
+                <span class="font-medium text-blue-600">8,547</span>
+              </div>
+              <div class="flex justify-between items-center">
+                <span class="text-gray-600 text-sm">达标率</span>
+                <div class="relative w-20 h-2 bg-cyan-100 rounded-full">
+                  <div class="absolute left-0 h-full bg-blue-500 rounded-full w-3/4"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+  
+        <!-- 睡眠质量卡片 -->
+        <div class="bg-gradient-to-br from-indigo-50 to-blue-50 rounded-2xl p-5 relative overflow-hidden">
+          <div class="absolute top-0 right-0 w-24 h-24 bg-indigo-100/30 rounded-bl-full"></div>
+          <div class="relative">
+            <div class="flex items-center gap-3 mb-4">
+              <div class="w-10 h-10 bg-indigo-500 rounded-lg flex items-center justify-center text-white">
+                <i class="fas fa-moon"></i>
+              </div>
+              <h3 class="font-semibold text-gray-700">睡眠分析</h3>
+            </div>
+            <div class="space-y-3">
+              <div class="flex justify-between items-center">
+                <span class="text-gray-600 text-sm">深睡时长</span>
+                <span class="font-medium text-indigo-600">2h15m</span>
+              </div>
+              <div class="flex justify-between items-center">
+                <span class="text-gray-600 text-sm">质量评分</span>
+                <div class="flex items-center gap-1">
+                  <i class="fas fa-star text-yellow-400"></i>
+                  <span class="font-medium">4.2</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+  
+        <!-- 生理周期卡片 -->
+        <div class="bg-gradient-to-br from-pink-50 to-rose-50 rounded-2xl p-5 relative overflow-hidden">
+          <div class="absolute top-0 right-0 w-24 h-24 bg-pink-100/30 rounded-bl-full"></div>
+          <div class="relative">
+            <div class="flex items-center gap-3 mb-4">
+              <div class="w-10 h-10 bg-pink-500 rounded-lg flex items-center justify-center text-white">
+                <i class="fas fa-venus"></i>
+              </div>
+              <h3 class="font-semibold text-gray-700">生理周期</h3>
+            </div>
+            <div class="space-y-3">
+              <div class="flex justify-between items-center">
+                <span class="text-gray-600 text-sm">当前阶段</span>
+                <span class="font-medium text-pink-600">经期第2天</span>
+              </div>
+              <div class="flex justify-between items-center">
+                <span class="text-gray-600 text-sm">剩余天数</span>
+                <span class="font-medium text-pink-600">3天</span>
+              </div>
+            </div>
+          </div>
+        </div>
+  
+        <!-- 饮水追踪卡片 -->
+        <div class="bg-gradient-to-br from-amber-50 to-orange-50 rounded-2xl p-5 relative overflow-hidden">
+          <div class="absolute top-0 right-0 w-24 h-24 bg-amber-100/30 rounded-bl-full"></div>
+          <div class="relative">
+            <div class="flex items-center gap-3 mb-4">
+                <div class="w-10 h-10 bg-amber-500 rounded-lg flex items-center justify-center text-white">
+                    <i class="fas fa-glass-water-droplet text-lg"></i> <!-- 修改后的行 -->
+                  </div>
+              <h3 class="font-semibold text-gray-700">饮水记录</h3>
+            </div>
+            <div class="space-y-3">
+              <div class="flex justify-between items-center">
+                <span class="text-gray-600 text-sm">今日饮水</span>
+                <span class="font-medium text-amber-600">1.2L</span>
+              </div>
+              <div class="flex justify-between items-center">
+                <span class="text-gray-600 text-sm">目标进度</span>
+                <div class="relative w-20 h-2 bg-amber-100 rounded-full">
+                  <div class="absolute left-0 h-full bg-amber-500 rounded-full w-2/3"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  
+    <!-- 健康数据可视化 -->
+    <section class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <!-- BMI环形图 -->
+      <div class="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
+        <div class="flex items-center justify-between mb-6">
+          <h3 class="text-lg font-semibold text-gray-800">体重管理</h3>
+          <button onclick="openWeightModal()" class="text-emerald-600 hover:text-emerald-700 text-sm flex items-center gap-1">
+            <i class="fas fa-edit"></i>
+            <span>记录数据</span>
+          </button>
+        </div>
+        <div class="flex flex-col lg:flex-row items-center gap-8">
+          <div class="relative w-48 h-48">
+            <div class="absolute inset-0 rounded-full border-8 border-gray-100"></div>
+            <div class="absolute inset-0 rounded-full border-8 border-emerald-500 border-t-transparent -rotate-45"></div>
+            <div class="absolute inset-0 flex items-center justify-center">
+              <div class="text-center">
+                <div class="text-3xl font-bold text-emerald-600">22.1</div>
+                <div class="text-sm text-gray-500">健康 BMI</div>
+              </div>
+            </div>
+          </div>
+          <div class="flex-1 w-full space-y-4">
+            <div class="flex items-center justify-between p-3 bg-emerald-50 rounded-lg">
+              <div class="text-sm text-gray-600">当前体重</div>
+              <div class="font-medium text-emerald-600">58.6 kg</div>
+            </div>
+            <div class="flex items-center justify-between p-3 bg-emerald-50 rounded-lg">
+              <div class="text-sm text-gray-600">目标体重</div>
+              <div class="font-medium text-emerald-600">55.0 kg</div>
+            </div>
+            <div class="flex items-center justify-between p-3 bg-emerald-50 rounded-lg">
+              <div class="text-sm text-gray-600">体脂率</div>
+              <div class="font-medium text-emerald-600">24.5%</div>
+            </div>
+          </div>
+        </div>
+      </div>
+  
+      <!-- 健康趋势图 -->
+      <div class="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
+        <div class="flex items-center justify-between mb-6">
+          <h3 class="text-lg font-semibold text-gray-800">每周活动趋势</h3>
+          <div class="flex gap-2">
+            <button class="text-gray-500 hover:text-emerald-600 px-3 py-1 rounded-lg text-sm">步数</button>
+            <button class="text-gray-500 hover:text-emerald-600 px-3 py-1 rounded-lg text-sm">卡路里</button>
+            <button class="text-gray-500 hover:text-emerald-600 px-3 py-1 rounded-lg text-sm">心率</button>
+          </div>
+        </div>
+        <div class="h-64 bg-gray-50 rounded-xl animate-pulse">
+          <!-- 此处可集成图表库 -->
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <!-- 在个人主页模块末尾添加体重记录弹窗 -->
+<div id="weightModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+    <div class="w-full max-w-md bg-white rounded-2xl p-6 shadow-xl">
+      <div class="flex justify-between items-center mb-4">
+        <h3 class="text-lg font-semibold text-gray-800">记录身体数据</h3>
+        <button onclick="closeWeightModal()" class="text-gray-400 hover:text-gray-600">
+          <i class="fas fa-times text-lg"></i>
+        </button>
+      </div>
+      
+      <form class="space-y-4">
+        <!-- 体重输入 -->
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-2">当前体重 (kg)</label>
+          <div class="relative">
+            <input type="number" step="0.1" 
+                   class="w-full px-4 py-3 rounded-lg border border-gray-200 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                   placeholder="58.6">
+            <div class="absolute inset-y-0 right-3 flex items-center">
+              <span class="text-gray-400">kg</span>
+            </div>
+          </div>
+        </div>
+  
+        <!-- 体脂率输入 -->
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-2">体脂率 (%)</label>
+          <div class="relative">
+            <input type="number" step="0.1"
+                   class="w-full px-4 py-3 rounded-lg border border-gray-200 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                   placeholder="24.5">
+            <div class="absolute inset-y-0 right-3 flex items-center">
+              <span class="text-gray-400">%</span>
+            </div>
+          </div>
+        </div>
+  
+        <!-- 记录时间 -->
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-2">记录时间</label>
+          <input type="datetime-local" 
+                 class="w-full px-4 py-3 rounded-lg border border-gray-200 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500">
+        </div>
+  
+        <!-- 操作按钮 -->
+        <div class="flex gap-3 pt-4">
+          <button type="button" onclick="closeWeightModal()" 
+                  class="flex-1 py-3 rounded-xl border border-gray-300 text-gray-700 hover:bg-gray-50 transition-colors">
+            取消
+          </button>
+          <button type="submit" 
+                  class="flex-1 py-3 rounded-xl bg-emerald-500 text-white hover:bg-emerald-600 transition-colors">
+            保存数据
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+  
+  <script>
+  // 体重记录弹窗控制
+  function openWeightModal() {
+    document.getElementById('weightModal').classList.remove('hidden')
+  }
+  
+  function closeWeightModal() {
+    document.getElementById('weightModal').classList.add('hidden')
+  }
+  </script>
+
+     <!-- 睡眠数据录入弹窗 -->
+     <div id="sleepModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div class="w-full max-w-[500px] bg-white rounded-2xl p-6 shadow-lg">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-lg font-bold text-gray-800">记录睡眠</h3>
+                <button onclick="closeSleepModal()" class="text-gray-500 hover:text-gray-700">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+
+            <form id="sleepForm" class="space-y-4">
+                <div>
+                    <label class="block text-gray-700 text-sm font-medium mb-2">入睡时间</label>
+                    <input 
+                        type="time" 
+                        id="sleepTimeInput"
+                        class="w-full px-4 py-2 rounded-lg border border-gray-300 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-200" 
+                        required
+                    >
+                </div>
+
+                <div>
+                    <label class="block text-gray-700 text-sm font-medium mb-2">起床时间</label>
+                    <input 
+                        type="time" 
+                        id="wakeTimeInput"
+                        class="w-full px-4 py-2 rounded-lg border border-gray-300 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-200" 
+                        required
+                    >
+                </div>
+
+                <div>
+                    <label class="block text-gray-700 text-sm font-medium mb-2">睡眠质量</label>
+                    <select 
+                        id="qualitySelect"
+                        class="w-full px-4 py-2 rounded-lg border border-gray-300 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-200"
+                    >
+                        <option value="excellent">非常好</option>
+                        <option value="good">好</option>
+                        <option value="fair">一般</option>
+                        <option value="poor">差</option>
+                    </select>
+                </div>
+
+                <div class="flex space-x-3">
+                    <button onclick="closeSleepModal()" class="flex-1 py-2 rounded-xl border border-indigo-500 text-indigo-500 font-medium hover:bg-indigo-50">
+                        取消
+                    </button>
+                    <button onclick="handleSleepSubmit(event)" class="flex-1 py-2 rounded-xl bg-indigo-500 text-white font-medium hover:bg-indigo-600">
+                        保存
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- BMI记录弹窗 -->
+    <div id="bmiModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div class="w-full max-w-[800px] bg-white rounded-2xl p-4 shadow-lg">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-lg font-bold text-gray-800">记录BMI</h3>
+                <button onclick="closeBmiModal()" class="text-gray-500 hover:text-gray-700">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+
+            <form id="bmiForm" class="space-y-4">
+                <div>
+                    <label class="block text-gray-700 text-sm font-medium mb-1">
+                        体重(kg) <span class="text-emerald-500">*</span>
+                    </label>
+                    <input 
+                        type="number" 
+                        id="weightInput"
+                        step="0.1"
+                        class="w-full px-3 py-2 rounded-lg border focus:border-emerald-500 focus:ring-1 focus:ring-emerald-200"
+                        required
+                    >
+                </div>
+
+                <div>
+                    <label class="block text-gray-700 text-sm font-medium mb-1">
+                        身高(cm) <span class="text-emerald-500">*</span>
+                    </label>
+                    <input 
+                        type="number" 
+                        id="heightInput"
+                        step="0.1"
+                        class="w-full px-3 py-2 rounded-lg border focus:border-emerald-500 focus:ring-1 focus:ring-emerald-200"
+                        required
+                    >
+                </div>
+
+                <div class="flex space-x-3 pt-2">
+                    <button type="button" onclick="closeBmiModal()" class="flex-1 py-2 rounded-xl border border-emerald-500 text-emerald-500 font-medium hover:bg-emerald-50">
+                        取消
+                    </button>
+                    <button type="button" onclick="handleBmiSubmit(event)" class="flex-1 py-2 rounded-xl bg-emerald-500 text-white font-medium hover:bg-emerald-600">
+                        保存
+                    </button>
+                </div>
+            </form>
+        </div>
+        
+    </div>
+
+</div>
+
+<!-- Toast提示 -->
+<div id="toast" class="hidden fixed top-4 right-4 bg-gray-800 text-white px-6 py-3 rounded-lg shadow-lg">
+    <p id="toastMessage"></p>
+</div>
+
+<script>
+// 全局变量
+let currentDate = new Date();
+let selectedDate = null;
+
+// 心情选项
+const moods = [
+    { emoji: '😊', text: '开心' },
+    { emoji: '🥰', text: '幸福' },
+    { emoji: '😴', text: '疲惫' },
+    { emoji: '😢', text: '难过' },
+    { emoji: '😡', text: '烦躁' },
+    { emoji: '🤒', text: '不适' },
+    { emoji: '😫', text: '痛经' },
+    { emoji: '🤔', text: '困惑' }
+];
+
+// 初始化日历
+function initCalendar() {
+    updateCalendar();
+    setupMoodPicker();
+}
+
+// 更新日历显示
+function updateCalendar() {
+    const year = currentDate.getFullYear();
+    const month = currentDate.getMonth();
+    
+    // 更新月份标签
+    document.getElementById('currentMonthLabel').textContent = 
+        `${year}年${month + 1}月`;
+    
+    const grid = document.getElementById('calendarGrid');
+    grid.innerHTML = '';
+    
+    // 获取月份的第一天和最后一天
+    const firstDay = new Date(year, month, 1);
+    const lastDay = new Date(year, month + 1, 0);
+    
+    // 填充日期
+    const firstDayOfWeek = firstDay.getDay();
+    const totalDays = lastDay.getDate();
+    
+    // 上个月的日期
+    for (let i = 0; i < firstDayOfWeek; i++) {
+        const prevDate = new Date(year, month, -firstDayOfWeek + i + 1);
+        addDateToGrid(prevDate, true);
+    }
+    
+    // 当前月的日期
+    for (let i = 1; i <= totalDays; i++) {
+        const date = new Date(year, month, i);
+        addDateToGrid(date, false);
+    }
+    
+    // 下个月的日期
+    const remainingDays = 42 - (firstDayOfWeek + totalDays);
+    for (let i = 1; i <= remainingDays; i++) {
+        const nextDate = new Date(year, month + 1, i);
+        addDateToGrid(nextDate, true);
+    }
+}
+
+// 添加日期到网格
+function addDateToGrid(date, isOtherMonth) {
+    const grid = document.getElementById('calendarGrid');
+    const dateDiv = document.createElement('div');
+    
+    dateDiv.className = `
+        relative h-10 rounded-lg flex flex-col items-center justify-center
+        cursor-pointer hover:bg-pink-50 transition-colors
+        ${isOtherMonth ? 'text-gray-400' : 'text-gray-700'}
+    `;
+    
+    // 日期数字
+    const dateNum = document.createElement('div');
+    dateNum.textContent = date.getDate();
+    dateNum.className = 'text-sm';
+    dateDiv.appendChild(dateNum);
+    
+    // 添加心情图标（如果有）
+    const mood = getMood(date);
+    if (mood) {
+        const moodIcon = document.createElement('div');
+        moodIcon.className = 'text-xs absolute bottom-1';
+        moodIcon.textContent = mood.emoji;
+        dateDiv.appendChild(moodIcon);
+    }
+    
+    // 添加点击事件
+    dateDiv.addEventListener('click', () => showDayDetail(date));
+    
+    grid.appendChild(dateDiv);
+}
+
+// 显示日期详情
+function showDayDetail(date) {
+    selectedDate = date;
+    
+    // 更新弹窗日期
+    const options = { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' };
+    document.getElementById('modalDate').textContent = 
+        date.toLocaleDateString('zh-CN', options);
+    
+    // 更新心情显示
+    updateMoodDisplay();
+    
+    // 显示弹窗
+    document.getElementById('dayDetailModal').classList.remove('hidden');
+}
+
+// 设置心情选择器
+function setupMoodPicker() {
+    const grid = document.getElementById('moodGrid');
+    grid.innerHTML = moods.map(mood => `
+        <button 
+            onclick="selectMood('${mood.emoji}', '${mood.text}')"
+            class="p-3 hover:bg-pink-50 rounded-xl flex flex-col items-center"
+        >
+            <span class="text-2xl mb-1">${mood.emoji}</span>
+            <span class="text-xs text-gray-600">${mood.text}</span>
+        </button>
+    `).join('');
+}
+
+// 打开心情选择器
+function openMoodPicker() {
+    document.getElementById('moodPickerModal').classList.remove('hidden');
+}
+
+// 选择心情
+function selectMood(button, value) {
+    document.querySelectorAll('.mood-btn').forEach(btn => {
+        btn.classList.remove('bg-pink-500', 'text-white', 'border-pink-500');
+        btn.classList.add('border-gray-200');
+    });
+    
+    button.classList.remove('border-gray-200');
+    button.classList.add('bg-pink-500', 'text-white', 'border-pink-500');
+    
+    document.getElementById('selectedMood').value = value;
+}
+
+// 更新心情显示
+function updateMoodDisplay() {
+    const mood = getMood(selectedDate);
+    const display = document.getElementById('currentMood');
+    
+    if (mood) {
+        display.innerHTML = `
+            <span class="text-2xl">${mood.emoji}</span>
+            <span class="text-sm text-gray-600">${mood.text}</span>
+        `;
+    } else {
+        display.innerHTML = `
+            <span class="text-2xl">😐</span>
+            <span class="text-sm text-gray-500">暂无记录</span>
+        `;
+    }
+}
+
+// 获取指定日期的心情
+function getMood(date) {
+    const moods = JSON.parse(localStorage.getItem('moods') || '{}');
+    const dateStr = date.toISOString().split('T')[0];
+    return moods[dateStr];
+}
+
+// 保存心情
+function saveMood(moodData) {
+    const moods = JSON.parse(localStorage.getItem('moods') || '{}');
+    const dateStr = new Date(moodData.date).toISOString().split('T')[0];
+    moods[dateStr] = {
+        emoji: moodData.emoji,
+        text: moodData.text
+    };
+    localStorage.setItem('moods', JSON.stringify(moods));
+}
+
+// 切换月份
+function changeMonth(delta) {
+    currentDate.setMonth(currentDate.getMonth() + delta);
+    updateCalendar();
+}
+
+// 关闭弹窗
+function closeModal(modalId) {
+    document.getElementById(modalId).classList.add('hidden');
+    if (modalId === 'dayDetailModal') {
+        selectedDate = null;
+    }
+}
+
+// 初始化
+document.addEventListener('DOMContentLoaded', initCalendar);
+
+// 添加点击遮罩层关闭弹窗
+document.querySelectorAll('.fixed').forEach(modal => {
+    modal.addEventListener('click', (e) => {
+        if (e.target === modal) {
+            closeModal(modal.id);
+        }
+    });
+});
+
+// 添加ESC键关闭弹窗
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+        closeModal('dayDetailModal');
+        closeModal('moodPickerModal');
+    }
+});
+
+let sleepStageChart = null;
+
+// 初始化睡眠阶段图表
+function initializeSleepStageChart() {
+    const ctx = document.getElementById('sleepStageChart');
+    if (!ctx) return;
+
+    // 销毁现有图表（如果存在）
+    if (sleepStageChart) {
+        sleepStageChart.destroy();
+    }
+
+    sleepStageChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: [],
+            datasets: [{
+                label: '睡眠阶段',
+                data: [],
+                borderColor: '#6366f1',
+                backgroundColor: 'rgba(99, 102, 241, 0.1)',
+                fill: true,
+                stepped: true,
+                tension: 0,
+                pointRadius: 4,
+                pointBackgroundColor: '#6366f1',
+                pointBorderColor: '#ffffff',
+                pointBorderWidth: 2,
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: {
+                    min: -0.5,
+                    max: 2.5,
+                    ticks: {
+                        stepSize: 1,
+                        callback: function(value) {
+                            switch (value) {
+                                case 0: return '清醒';
+                                case 1: return '浅睡';
+                                case 2: return '深睡';
+                                default: return '';
+                            }
+                        }
+                    },
+                    grid: {
+                        color: 'rgba(0, 0, 0, 0.05)'
+                    }
+                },
+                x: {
+                    grid: {
+                        display: false
+                    },
+                    ticks: {
+                        maxRotation: 0,
+                        autoSkip: true,
+                        maxTicksLimit: 6
+                    }
+                }
+            },
+            plugins: {
+                legend: {
+                    display: false
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            const value = context.parsed.y;
+                            switch (value) {
+                                case 0: return '清醒';
+                                case 1: return '浅度睡眠';
+                                case 2: return '深度睡眠';
+                                default: return '';
+                            }
+                        }
+                    }
+                }
+            },
+            interaction: {
+                intersect: false,
+                mode: 'index'
+            }
+        }
+    });
+}
+
+// 生成睡眠阶段数据
+function generateSleepStageData(sleepTime, wakeTime, quality) {
+    const sleepDate = new Date(`2000-01-01T${sleepTime}`);
+    const wakeDate = new Date(`2000-01-01T${wakeTime}`);
+    if (wakeDate < sleepDate) {
+        wakeDate.setDate(wakeDate.getDate() + 1);
+    }
+
+    const timePoints = [];
+    const stages = [];
+    let currentDate = new Date(sleepDate);
+    let deepSleepMinutes = 0;
+    let lightSleepMinutes = 0;
+    let awakeMinutes = 0;
+
+    // 每30分钟记录一个数据点
+    while (currentDate <= wakeDate) {
+        timePoints.push(currentDate.toLocaleTimeString('zh-CN', {
+            hour: '2-digit',
+            minute: '2-digit'
+        }));
+
+        const hoursSinceSleep = (currentDate - sleepDate) / (1000 * 60 * 60);
+        const hoursUntilWake = (wakeDate - currentDate) / (1000 * 60 * 60);
+        let stage;
+
+        // 入睡和醒来前的清醒期
+        if (hoursSinceSleep < 0.5 || hoursUntilWake < 0.5) {
+            stage = 0;
+            awakeMinutes += 30;
+        }
+        // 深度睡眠通常在入睡后2-4小时
+        else if (hoursSinceSleep > 2 && hoursSinceSleep < 4) {
+            stage = Math.random() > 0.3 ? 2 : 1;
+            if (stage === 2) deepSleepMinutes += 30;
+            else lightSleepMinutes += 30;
+        }
+        // 其他时间以浅睡为主
+        else {
+            stage = Math.random() > 0.8 ? 2 : 1;
+            if (stage === 2) deepSleepMinutes += 30;
+            else lightSleepMinutes += 30;
+        }
+
+        stages.push(stage);
+        currentDate.setMinutes(currentDate.getMinutes() + 30);
+    }
+
+    // 更新睡眠时长显示
+    document.getElementById('deepSleepTime').textContent = `${Math.round(deepSleepMinutes / 60 * 10) / 10}h`;
+    document.getElementById('lightSleepTime').textContent = `${Math.round(lightSleepMinutes / 60 * 10) / 10}h`;
+    document.getElementById('awakeTime').textContent = `${Math.round(awakeMinutes / 60 * 10) / 10}h`;
+
+    return {
+        labels: timePoints,
+        stages: stages
+    };
+}
+
+// 更新睡眠阶段图表
+function updateSleepStageChart(data) {
+    if (!sleepStageChart) {
+        initializeSleepStageChart();
+    }
+
+    sleepStageChart.data.labels = data.labels;
+    sleepStageChart.data.datasets[0].data = data.stages;
+    sleepStageChart.update();
+}
+
+// 修改保存睡眠数据的函数
+function saveSleepData(data) {
+    try {
+        let sleepRecords = JSON.parse(localStorage.getItem('sleepRecords') || '[]');
+        sleepRecords.push({
+            ...data,
+            timestamp: new Date().toISOString()
+        });
+        localStorage.setItem('sleepRecords', JSON.stringify(sleepRecords));
+        
+        // 生成并更新睡眠阶段数据
+        const stageData = generateSleepStageData(data.sleepTime, data.wakeTime, data.quality);
+        updateSleepStageChart(stageData);
+        
+        updateSleepDisplay();
+        updateSleepSuggestions(data);
+    } catch (error) {
+        console.error('保存数据失败:', error);
+        showToast('保存失败，请重试');
+    }
+}
+
+// 在页面加载时初始化图表
+document.addEventListener('DOMContentLoaded', () => {
+    initializeSleepStageChart();
+    
+    // 如果有最近的睡眠记录，显示其睡眠阶段数据
+    const records = JSON.parse(localStorage.getItem('sleepRecords') || '[]');
+    if (records.length > 0) {
+        const latestRecord = records[records.length - 1];
+        const stageData = generateSleepStageData(latestRecord.sleepTime, latestRecord.wakeTime, latestRecord.quality);
+        updateSleepStageChart(stageData);
+    }
+});
+
+// 运动模块相关函数
+function openExerciseModal() {
+    const modal = document.getElementById('exerciseModal');
+    if (modal) {
+        modal.classList.remove('hidden');
+    }
+}
+
+function closeExerciseModal() {
+    const modal = document.getElementById('exerciseModal');
+    if (modal) {
+        modal.classList.add('hidden');
+    }
+    const form = document.getElementById('exerciseForm');
+    if (form) {
+        form.reset();
+    }
+}
+
+function handleExerciseSubmit(event) {
+    event.preventDefault();
+    
+    const steps = document.getElementById('stepsInput').value;
+    
+    if (!steps || steps <= 0) {
+        showToast('请输入有效的步数');
+        return;
+    }
+    
+    const formData = {
+        steps: parseInt(steps),
+        types: Array.from(document.querySelectorAll('input[name="exerciseType"]:checked'))
+            .map(cb => cb.value),
+        date: new Date().toISOString().split('T')[0]
+    };
+    
+    saveExerciseData(formData);
+    showToast('运动记录已保存');
+    closeExerciseModal();
+}
+
+function saveExerciseData(data) {
+    try {
+        let exerciseRecords = JSON.parse(localStorage.getItem('exerciseRecords') || '[]');
+        exerciseRecords.push({
+            ...data,
+            timestamp: new Date().toISOString()
+        });
+        localStorage.setItem('exerciseRecords', JSON.stringify(exerciseRecords));
+        updateExerciseDisplay();
+    } catch (error) {
+        console.error('保存运动数据失败:', error);
+        showToast('保存失败，请重试');
+    }
+}
+
+// 经期模块相关函数
+function openPeriodModal() {
+    const modal = document.getElementById('periodModal');
+    if (modal) {
+        modal.classList.remove('hidden');
+    }
+}
+
+function closePeriodModal() {
+    const modal = document.getElementById('periodModal');
+    if (modal) {
+        modal.classList.add('hidden');
+    }
+    const form = document.getElementById('periodForm');
+    if (form) {
+        form.reset();
+    }
+    // 重置出血量按钮状态
+    document.querySelectorAll('.flow-btn').forEach(btn => {
+        btn.classList.remove('bg-pink-500', 'text-white', 'border-pink-500');
+        btn.classList.add('border-gray-200');
+    });
+    document.getElementById('selectedFlow').value = '';
+}
+
+function selectFlow(button, value) {
+    document.querySelectorAll('.flow-btn').forEach(btn => {
+        btn.classList.remove('bg-pink-500', 'text-white', 'border-pink-500');
+        btn.classList.add('border-gray-200');
+    });
+    
+    button.classList.remove('border-gray-200');
+    button.classList.add('bg-pink-500', 'text-white', 'border-pink-500');
+    
+    document.getElementById('selectedFlow').value = value;
+}
+
+function handlePeriodSubmit(event) {
+    event.preventDefault();
+    
+    const startDate = document.getElementById('periodStartDate').value;
+    const endDate = document.getElementById('periodEndDate').value;
+    const flow = document.getElementById('selectedFlow').value;
+    const mood = document.getElementById('selectedMood').value;
+    const notes = document.getElementById('periodNotes').value;
+    
+    if (!startDate) {
+        showToast('请选择开始日期');
+        return;
+    }
+    
+    if (!flow) {
+        showToast('请选择出血量');
+        return;
+    }
+    
+    const formData = {
+        startDate,
+        endDate,
+        flow,
+        mood,
+        symptoms: Array.from(document.querySelectorAll('input[name="symptoms"]:checked'))
+            .map(cb => cb.value),
+        notes,
+        date: new Date().toISOString().split('T')[0]
+    };
+    
+    savePeriodData(formData);
+    showToast('经期记录已保存');
+    closePeriodModal();
+}
+
+function savePeriodData(data) {
+    try {
+        let periodRecords = JSON.parse(localStorage.getItem('periodRecords') || '[]');
+        periodRecords.push({
+            ...data,
+            timestamp: new Date().toISOString()
+        });
+        localStorage.setItem('periodRecords', JSON.stringify(periodRecords));
+        updatePeriodDisplay();
+    } catch (error) {
+        console.error('保存经期数据失败:', error);
+        showToast('保存失败，请重试');
+    }
+}
+
+// 初始化函数
+document.addEventListener('DOMContentLoaded', () => {
+    // 更新所有模块的日期显示
+    updateCurrentDate();
+    
+    // 初始化各模块的数据显示
+    updateSleepDisplay();
+    updateExerciseDisplay();
+    updatePeriodDisplay();
+    
+    // 绑定ESC键关闭所有弹窗
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+            closeSleepModal();
+            closeExerciseModal();
+            closePeriodModal();
+        }
+    });
+    
+    // 绑定点击遮罩层关闭弹窗
+    const modals = ['sleepRecordModal', 'exerciseModal', 'periodModal'];
+    modals.forEach(modalId => {
+        const modal = document.getElementById(modalId);
+        if (modal) {
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) {
+                    switch(modalId) {
+                        case 'sleepRecordModal':
+                            closeSleepModal();
+                            break;
+                        case 'exerciseModal':
+                            closeExerciseModal();
+                            break;
+                        case 'periodModal':
+                            closePeriodModal();
+                            break;
+                    }
+                }
+            });
+        }
+    });
+});
+
+let bmiTrendChart = null;
+
+// BMI相关函数
+function openBmiModal() {
+    const modal = document.getElementById('bmiModal');
+    if (modal) {
+        modal.classList.remove('hidden');
+        // 如果有最近的记录，预填身高
+        const records = JSON.parse(localStorage.getItem('bmiRecords') || '[]');
+        if (records.length > 0) {
+            document.getElementById('heightInput').value = records[records.length - 1].height;
+        }
+    }
+}
+
+function closeBmiModal() {
+    const modal = document.getElementById('bmiModal');
+    if (modal) {
+        modal.classList.add('hidden');
+    }
+    const form = document.getElementById('bmiForm');
+    if (form) {
+        form.reset();
+    }
+}
+
+function calculateBMI(weight, height) {
+    // 将身高从厘米转换为米
+    const heightInMeters = height / 100;
+    return weight / (heightInMeters * heightInMeters);
+}
+
+function getBmiStatus(bmi) {
+    if (bmi < 18.5) return { status: '偏瘦', color: 'text-blue-600' };
+    if (bmi < 24) return { status: '健康', color: 'text-emerald-600' };
+    if (bmi < 28) return { status: '超重', color: 'text-yellow-600' };
+    return { status: '肥胖', color: 'text-red-600' };
+}
+
+function getBmiSuggestions(bmi) {
+    const suggestions = [];
+    
+    if (bmi < 18.5) {
+        suggestions.push({
+            icon: '🍗',
+            title: '增加营养摄入',
+            content: '建议适当增加蛋白质和健康脂肪的摄入，保持均衡饮食。'
+        });
+        suggestions.push({
+            icon: '💪',
+            title: '进行力量训练',
+            content: '建议进行适度的力量训练，帮助增加肌肉量。'
+        });
+    } else if (bmi >= 24 && bmi < 28) {
+        suggestions.push({
+            icon: '🥗',
+            title: '调整饮食结构',
+            content: '建议减少高热量食物摄入，增加蔬菜水果的比例。'
+        });
+        suggestions.push({
+            icon: '🏃',
+            title: '增加有氧运动',
+            content: '建议每周进行3-4次有氧运动，每次30分钟以上。'
+        });
+    } else if (bmi >= 28) {
+        suggestions.push({
+            icon: '⚖️',
+            title: '控制热量摄入',
+            content: '建议严格控制每日热量摄入，避免高糖高脂食物。'
+        });
+        suggestions.push({
+            icon: '👨‍⚕️',
+            title: '寻求专业建议',
+            content: '建议咨询营养师或医生，制定科学的减重计划。'
+        });
+    } else {
+        suggestions.push({
+            icon: '✨',
+            title: '保持现状',
+            content: '当前BMI处于健康范围，建议保持良好的饮食和运动习惯。'
+        });
+    }
+    
+    return suggestions;
+}
+
+function handleBmiSubmit(event) {
+    event.preventDefault();
+    
+    const weight = parseFloat(document.getElementById('weightInput').value);
+    const height = parseFloat(document.getElementById('heightInput').value);
+    
+    if (!weight || !height) {
+        showToast('请填写体重和身高');
+        return;
+    }
+    
+    if (weight < 20 || weight > 200) {
+        showToast('请输入合理的体重范围');
+        return;
+    }
+    
+    if (height < 100 || height > 250) {
+        showToast('请输入合理的身高范围');
+        return;
+    }
+    
+    const bmi = calculateBMI(weight, height);
+    const formData = {
+        weight,
+        height,
+        bmi: Math.round(bmi * 10) / 10,
+        date: new Date().toISOString().split('T')[0]
+    };
+    
+    saveBmiData(formData);
+    showToast('记录已保存');
+    closeBmiModal();
+}
+
+function saveBmiData(data) {
+    try {
+        let bmiRecords = JSON.parse(localStorage.getItem('bmiRecords') || '[]');
+        bmiRecords.push({
+            ...data,
+            timestamp: new Date().toISOString()
+        });
+        localStorage.setItem('bmiRecords', JSON.stringify(bmiRecords));
+        updateBmiDisplay();
+        updateBmiTrendChart();
+    } catch (error) {
+        console.error('保存BMI数据失败:', error);
+        showToast('保存失败，请重试');
+    }
+}
+
+function initializeBmiTrendChart() {
+    const ctx = document.getElementById('bmiTrendChart');
+    if (!ctx) return;
+
+    if (bmiTrendChart) {
+        bmiTrendChart.destroy();
+    }
+
+    bmiTrendChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: [],
+            datasets: [{
+                label: 'BMI',
+                data: [],
+                borderColor: '#10b981',
+                backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                fill: true,
+                tension: 0.4
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    display: false
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: false,
+                    grid: {
+                        color: 'rgba(0, 0, 0, 0.05)'
+                    }
+                },
+                x: {
+                    grid: {
+                        display: false
+                    }
+                }
+            }
+        }
+    });
+}
+
+function updateBmiTrendChart() {
+    if (!bmiTrendChart) {
+        initializeBmiTrendChart();
+    }
+
+    const records = JSON.parse(localStorage.getItem('bmiRecords') || '[]');
+    const recentRecords = records.slice(-10); // 显示最近10条记录
+
+    bmiTrendChart.data.labels = recentRecords.map(record => {
+        const date = new Date(record.date);
+        return `${date.getMonth() + 1}/${date.getDate()}`;
+    });
+    bmiTrendChart.data.datasets[0].data = recentRecords.map(record => record.bmi);
+    bmiTrendChart.update();
+}
+
+function updateBmiDisplay() {
+    const records = JSON.parse(localStorage.getItem('bmiRecords') || '[]');
+    if (records.length === 0) return;
+
+    const latestRecord = records[records.length - 1];
+    const bmi = latestRecord.bmi;
+    let statusColor, gaugeColor;
+
+    // 根据BMI值设置颜色
+    if (bmi < 18.5) {
+        statusColor = 'text-blue-600';
+        gaugeColor = 'border-blue-500';
+    } else if (bmi < 24) {
+        statusColor = 'text-emerald-600';
+        gaugeColor = 'border-emerald-500';
+    } else if (bmi < 28) {
+        statusColor = 'text-yellow-600';
+        gaugeColor = 'border-yellow-500';
+    } else {
+        statusColor = 'text-red-600';
+        gaugeColor = 'border-red-500';
+    }
+
+    // 更新显示
+    const bmiElement = document.getElementById('currentBmi');
+    const statusElement = document.getElementById('bmiStatus');
+    const gaugeElement = document.getElementById('bmiGauge');
+
+    bmiElement.textContent = bmi;
+    bmiElement.className = `text-3xl font-bold ${statusColor}`;
+    
+    const status = getBmiStatus(bmi);
+    statusElement.textContent = status.status;
+    statusElement.className = `text-sm ${statusColor}`;
+
+    // 更新仪表盘颜色和角度
+    gaugeElement.className = `absolute inset-0 rounded-full border-8 ${gaugeColor} border-t-transparent`;
+    const rotation = Math.min(Math.max((bmi - 15) * 10, 0), 180);
+    gaugeElement.style.transform = `rotate(${rotation}deg)`;
+
+    // 更新其他显示
+    document.getElementById('currentWeight').textContent = latestRecord.weight;
+    document.getElementById('currentHeight').textContent = latestRecord.height;
+
+    // 更新建议
+    updateBmiSuggestions(bmi);
+}
+
+// 初始化
+document.addEventListener('DOMContentLoaded', () => {
+    initializeBmiTrendChart();
+    updateBmiDisplay();
+});
+
+// 页面切换函数
+function switchBmiPage(pageIndex) {
+    const pages = ['bmiPage0', 'bmiPage1'];
+    const indicators = ['bmiPage0Indicator', 'bmiPage1Indicator'];
+    
+    pages.forEach((pageId, index) => {
+        const page = document.getElementById(pageId);
+        const indicator = document.getElementById(indicators[index]);
+        if (index === pageIndex) {
+            page.classList.remove('hidden');
+            indicator.classList.add('bg-emerald-500');
+            indicator.classList.remove('bg-emerald-200');
+        } else {
+            page.classList.add('hidden');
+            indicator.classList.remove('bg-emerald-500');
+            indicator.classList.add('bg-emerald-200');
+        }
+    });
+}
+
+// 初始化时添加触摸滑动支持
+document.addEventListener('DOMContentLoaded', () => {
+    const bmiModule = document.querySelector('.w-80.h-[600px]');
+    let touchStartX = 0;
+    let currentPage = 0;
+
+    bmiModule.addEventListener('touchstart', (e) => {
+        touchStartX = e.touches[0].clientX;
+    });
+
+    bmiModule.addEventListener('touchend', (e) => {
+        const touchEndX = e.changedTouches[0].clientX;
+        const diff = touchStartX - touchEndX;
+
+        if (Math.abs(diff) > 50) { // 最小滑动距离
+            if (diff > 0 && currentPage === 0) {
+                // 向左滑，切换到第二页
+                currentPage = 1;
+                switchBmiPage(1);
+            } else if (diff < 0 && currentPage === 1) {
+                // 向右滑，切换到第一页
+                currentPage = 0;
+                switchBmiPage(0);
+            }
+        }
+    });
+});
+
+class SleepAnalysis {
+    constructor() {
+        this.container = document.querySelector('.pages-wrapper');
+        this.navBtns = document.querySelectorAll('.nav-btn');
+        this.currentPage = 0;
+
+        this.initializeEvents();
+        this.initializeCharts();
+    }
+
+    initializeEvents() {
+        // 底部导航按钮点击事件
+        this.navBtns.forEach((btn, index) => {
+            btn.addEventListener('click', () => {
+                this.goToPage(index);
+                this.updateNavigation(index);
+            });
+        });
+
+        // 初始化状态
+        this.updateNavigation(0);
+    }
+
+    goToPage(pageIndex) {
+        this.currentPage = pageIndex;
+        this.container.style.transform = `translateX(-${pageIndex * 100}%)`;
+    }
+
+    updateNavigation(activeIndex) {
+        this.navBtns.forEach((btn, index) => {
+            const icon = btn.querySelector('svg');
+            const text = btn.querySelector('span');
+            if (index === activeIndex) {
+                icon.classList.remove('text-gray-400');
+                icon.classList.add('text-indigo-600');
+                text.classList.remove('text-gray-600');
+                text.classList.add('text-indigo-600');
+            } else {
+                icon.classList.remove('text-indigo-600');
+                icon.classList.add('text-gray-400');
+                text.classList.remove('text-indigo-600');
+                text.classList.add('text-gray-600');
+            }
+        });
+    }
+
+    initializeCharts() {
+        // 睡眠阶段图表
+        const stagesCtx = document.getElementById('sleepStagesChart').getContext('2d');
+        new Chart(stagesCtx, {
+            type: 'line',
+            data: {
+                labels: ['22:00', '23:00', '00:00', '01:00', '02:00', '03:00', '04:00', '05:00', '06:00', '07:00'],
+                datasets: [{
+                    label: '深度睡眠',
+                    data: [0, 2, 4, 3, 4, 3, 2, 1, 0],
+                    borderColor: 'rgba(99, 102, 241, 1)',
+                    backgroundColor: 'rgba(99, 102, 241, 0.1)',
+                    fill: true,
+                    tension: 0.4
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: false
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        max: 5
+                    }
+                }
+            }
+        });
+
+        // 睡眠趋势图表
+        const trendCtx = document.getElementById('sleepTrendChart').getContext('2d');
+        new Chart(trendCtx, {
+            type: 'line',
+            data: {
+                labels: ['周一', '周二', '周三', '周四', '周五', '周六', '周日'],
+                datasets: [{
+                    label: '睡眠时长',
+                    data: [7.5, 6.8, 7.2, 8.1, 6.5, 7.8, 7.3],
+                    borderColor: 'rgba(99, 102, 241, 1)',
+                    backgroundColor: 'rgba(99, 102, 241, 0.1)',
+                    fill: true
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false
+            }
+        });
+    }
+}
+
+// 初始化
+document.addEventListener('DOMContentLoaded', () => {
+    new SleepAnalysis();
+});
+</script>
+
+<style>
+/* 添加按钮过渡动画 */
+.flow-button {
+    transition: all 0.2s ease-in-out;
+}
+
+/* 添加弹窗动画 */
+.modal-enter {
+    animation: modalFadeIn 0.3s ease-out;
+}
+
+@keyframes modalFadeIn {
+    from {
+        opacity: 0;
+        transform: scale(0.95);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+/* 添加心情图标样式 */
+.calendar-day {
+    position: relative;
+    width: 2.5rem;
+    height: 2.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    border-radius: 0.5rem;
+    transition: all 0.2s;
+}
+
+.calendar-day:hover {
+    background-color: rgba(249, 168, 212, 0.1);
+}
+</style>
+
+<!-- 添加运动强度说明弹窗 -->
+<div id="intensityModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+    <div class="w-full max-w-md bg-white rounded-2xl p-6 shadow-lg max-h-[90vh] overflow-y-auto">
+        <div class="flex justify-between items-center mb-4">
+            <h3 class="text-lg font-bold text-gray-800">运动强度说明</h3>
+            <button onclick="closeIntensityModal()" class="text-gray-500 hover:text-gray-700">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        
+        <div class="space-y-4">
+            <p class="text-sm text-gray-600">运动强度分为以下几类：</p>
+            <ul class="list-disc pl-5 text-sm text-gray-600 space-y-3">
+                <li>
+                    <div class="font-semibold text-blue-600">低强度运动</div>
+                    <p class="mt-1">心率范围：最大心率的50%-60%</p>
+                    <p>适用活动：散步、轻度瑜伽、轻松骑行</p>
+                    <p>身体感觉：可以正常交谈，呼吸轻松</p>
+                </li>
+                <li>
+                    <div class="font-semibold text-blue-600">中等强度运动</div>
+                    <p class="mt-1">心率范围：最大心率的60%-75%</p>
+                    <p>适用活动：快走、慢跑、游泳、骑行</p>
+                    <p>身体感觉：呼吸稍快但平稳，能进行简短对话</p>
+                </li>
+                <li>
+                    <div class="font-semibold text-blue-600">高强度运动</div>
+                    <p class="mt-1">心率范围：最大心率的75%-90%</p>
+                    <p>适用活动：跑步、HIIT、快速游泳</p>
+                    <p>身体感觉：呼吸急促，难以持续对话</p>
+                </li>
+            </ul>
+            <div class="mt-4 p-4 bg-blue-50 rounded-lg">
+                <p class="text-sm text-blue-600">
+                    <i class="fas fa-info-circle mr-2"></i>
+                    提示：最大心率 ≈ 220 - 年龄
+                </p>
+            </div>
+            
+            <!-- 运动强度效果区域 -->
+            <div class="mt-6">
+                <h4 class="text-md font-semibold text-gray-700 mb-3">不同强度运动效果</h4>
+                <div class="space-y-3">
+                    <div class="bg-white border border-blue-100 rounded-xl p-4">
+                        <div class="flex items-start gap-3">
+                            <div class="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0">
+                                <i class="fas fa-fire-alt text-blue-500"></i>
+                            </div>
+                            <div>
+                                <h5 class="font-medium text-gray-800">脂肪燃烧</h5>
+                                <p class="text-sm text-gray-600 mt-1">低强度和中等强度运动更有利于脂肪燃烧。持续时间较长的中等强度运动，如30-60分钟的快走，是减脂的理想选择。</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-white border border-blue-100 rounded-xl p-4">
+                        <div class="flex items-start gap-3">
+                            <div class="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0">
+                                <i class="fas fa-heartbeat text-blue-500"></i>
+                            </div>
+                            <div>
+                                <h5 class="font-medium text-gray-800">心肺功能</h5>
+                                <p class="text-sm text-gray-600 mt-1">中高强度的有氧运动能有效提高心肺功能。高强度间歇训练(HIIT)可以在短时间内显著提升心肺能力。</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-white border border-blue-100 rounded-xl p-4">
+                        <div class="flex items-start gap-3">
+                            <div class="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0">
+                                <i class="fas fa-dumbbell text-blue-500"></i>
+                            </div>
+                            <div>
+                                <h5 class="font-medium text-gray-800">肌肉强化</h5>
+                                <p class="text-sm text-gray-600 mt-1">高强度力量训练对肌肉生长和力量提升最为有效。中等强度的力量训练则适合肌肉耐力的提高。</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 添加睡眠详细报告弹窗 -->
+<div id="sleepDetailModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+    <div class="w-full max-w-2xl bg-white rounded-2xl p-6 shadow-lg max-h-[90vh] overflow-y-auto">
+        <div class="flex justify-between items-center mb-6">
+            <h3 class="text-xl font-bold text-gray-800">睡眠详细报告</h3>
+            <button onclick="closeSleepDetailModal()" class="text-gray-500 hover:text-gray-700">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        
+        <!-- 睡眠质量概览 -->
+        <div class="grid grid-cols-3 gap-4 mb-6">
+            <div class="bg-indigo-50 rounded-xl p-4 text-center">
+                <div class="text-2xl font-bold text-indigo-600">85</div>
+                <div class="text-sm text-gray-600">睡眠评分</div>
+            </div>
+            <div class="bg-indigo-50 rounded-xl p-4 text-center">
+                <div class="text-2xl font-bold text-indigo-600">7h 30m</div>
+                <div class="text-sm text-gray-600">总睡眠时长</div>
+            </div>
+            <div class="bg-indigo-50 rounded-xl p-4 text-center">
+                <div class="text-2xl font-bold text-indigo-600">92%</div>
+                <div class="text-sm text-gray-600">睡眠效率</div>
+            </div>
+        </div>
+
+        <!-- 睡眠阶段详情 -->
+        <div class="mb-6">
+            <h4 class="text-lg font-semibold text-gray-800 mb-4">睡眠阶段分析</h4>
+            <div class="space-y-3">
+                <div class="flex items-center">
+                    <div class="w-24 text-sm text-gray-600">深度睡眠</div>
+                    <div class="flex-1 h-4 bg-gray-100 rounded-full overflow-hidden">
+                        <div class="h-full bg-indigo-600 rounded-full" style="width: 35%"></div>
+                    </div>
+                    <div class="w-20 text-right text-sm text-indigo-600">2h 15m</div>
+                </div>
+                <div class="flex items-center">
+                    <div class="w-24 text-sm text-gray-600">浅度睡眠</div>
+                    <div class="flex-1 h-4 bg-gray-100 rounded-full overflow-hidden">
+                        <div class="h-full bg-indigo-400 rounded-full" style="width: 55%"></div>
+                    </div>
+                    <div class="w-20 text-right text-sm text-indigo-600">4h 15m</div>
+                </div>
+                <div class="flex items-center">
+                    <div class="w-24 text-sm text-gray-600">清醒</div>
+                    <div class="flex-1 h-4 bg-gray-100 rounded-full overflow-hidden">
+                        <div class="h-full bg-gray-400 rounded-full" style="width: 10%"></div>
+                    </div>
+                    <div class="w-20 text-right text-sm text-indigo-600">1h</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 睡眠环境分析 -->
+        <div class="mb-6">
+            <h4 class="text-lg font-semibold text-gray-800 mb-4">睡眠环境</h4>
+            <div class="grid grid-cols-3 gap-4">
+                <div class="bg-white border border-gray-200 rounded-xl p-4">
+                    <div class="flex items-center gap-3">
+                        <i class="fas fa-temperature-low text-indigo-500"></i>
+                        <div>
+                            <div class="text-sm text-gray-600">室温</div>
+                            <div class="text-lg font-semibold">22.5°C</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="bg-white border border-gray-200 rounded-xl p-4">
+                    <div class="flex items-center gap-3">
+                        <i class="fas fa-volume-down text-indigo-500"></i>
+                        <div>
+                            <div class="text-sm text-gray-600">噪音</div>
+                            <div class="text-lg font-semibold">32dB</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="bg-white border border-gray-200 rounded-xl p-4">
+                    <div class="flex items-center gap-3">
+                        <i class="fas fa-lightbulb text-indigo-500"></i>
+                        <div>
+                            <div class="text-sm text-gray-600">光照</div>
+                            <div class="text-lg font-semibold">微弱</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 睡眠周期图表 -->
+        <div class="mb-6">
+            <h4 class="text-lg font-semibold text-gray-800 mb-4">睡眠周期</h4>
+            <div class="h-32 bg-indigo-50 rounded-xl p-4 flex items-end">
+                <!-- 睡眠周期波形图 -->
+                <div class="w-full h-full flex items-end">
+                    <div class="flex-1 flex items-end">
+                        <!-- 模拟睡眠周期波形 -->
+                        <div class="w-1/6 bg-indigo-200" style="height: 20%"></div>
+                        <div class="w-1/6 bg-indigo-300" style="height: 40%"></div>
+                        <div class="w-1/6 bg-indigo-500" style="height: 80%"></div>
+                        <div class="w-1/6 bg-indigo-600" style="height: 95%"></div>
+                        <div class="w-1/6 bg-indigo-400" style="height: 60%"></div>
+                        <div class="w-1/6 bg-indigo-300" style="height: 40%"></div>
+                        <div class="w-1/6 bg-indigo-200" style="height: 30%"></div>
+                        <div class="w-1/6 bg-indigo-400" style="height: 70%"></div>
+                        <div class="w-1/6 bg-indigo-500" style="height: 85%"></div>
+                        <div class="w-1/6 bg-indigo-600" style="height: 90%"></div>
+                        <div class="w-1/6 bg-indigo-400" style="height: 60%"></div>
+                        <div class="w-1/6 bg-indigo-300" style="height: 45%"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="flex justify-between text-xs text-gray-500 mt-2">
+                <span>23:30</span>
+                <span>01:30</span>
+                <span>03:30</span>
+                <span>05:30</span>
+                <span>07:00</span>
+            </div>
+        </div>
+
+        <!-- 睡眠质量指标 -->
+        <div class="mb-6">
+            <h4 class="text-lg font-semibold text-gray-800 mb-4">睡眠质量指标</h4>
+            <div class="grid grid-cols-2 gap-4">
+                <div class="bg-white border border-gray-200 rounded-xl p-4">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <div class="text-sm text-gray-600">夜间醒来次数</div>
+                            <div class="text-xl font-semibold text-indigo-600 mt-1">2次</div>
+                        </div>
+                        <div class="w-10 h-10 rounded-full bg-indigo-50 flex items-center justify-center">
+                            <i class="fas fa-bed text-indigo-500"></i>
+                        </div>
+                    </div>
+                </div>
+                <div class="bg-white border border-gray-200 rounded-xl p-4">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <div class="text-sm text-gray-600">入睡时间</div>
+                            <div class="text-xl font-semibold text-indigo-600 mt-1">18分钟</div>
+                        </div>
+                        <div class="w-10 h-10 rounded-full bg-indigo-50 flex items-center justify-center">
+                            <i class="fas fa-hourglass-half text-indigo-500"></i>
+                        </div>
+                    </div>
+                </div>
+                <div class="bg-white border border-gray-200 rounded-xl p-4">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <div class="text-sm text-gray-600">平均心率</div>
+                            <div class="text-xl font-semibold text-indigo-600 mt-1">58 bpm</div>
+                        </div>
+                        <div class="w-10 h-10 rounded-full bg-indigo-50 flex items-center justify-center">
+                            <i class="fas fa-heartbeat text-indigo-500"></i>
+                        </div>
+                    </div>
+                </div>
+                <div class="bg-white border border-gray-200 rounded-xl p-4">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <div class="text-sm text-gray-600">呼吸频率</div>
+                            <div class="text-xl font-semibold text-indigo-600 mt-1">14 次/分</div>
+                        </div>
+                        <div class="w-10 h-10 rounded-full bg-indigo-50 flex items-center justify-center">
+                            <i class="fas fa-wind text-indigo-500"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 改善建议 -->
+        <div>
+            <h4 class="text-lg font-semibold text-gray-800 mb-4">改善建议</h4>
+            <div class="bg-indigo-50 rounded-xl p-4 space-y-3">
+                <div class="flex items-start gap-3">
+                    <i class="fas fa-check-circle text-indigo-500 mt-1"></i>
+                    <p class="text-sm text-gray-600">建议保持固定的作息时间，避免昼夜颠倒</p>
+                </div>
+                <div class="flex items-start gap-3">
+                    <i class="fas fa-check-circle text-indigo-500 mt-1"></i>
+                    <p class="text-sm text-gray-600">睡前1小时避免使用电子设备，减少蓝光照射</p>
+                </div>
+                <div class="flex items-start gap-3">
+                    <i class="fas fa-check-circle text-indigo-500 mt-1"></i>
+                    <p class="text-sm text-gray-600">保持适宜的室温（18-22°C）和安静的睡眠环境</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+</body>
+</html>
