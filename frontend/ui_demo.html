@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
@@ -70,41 +71,16 @@ function handleSleepSubmit(event) {
         return;
     }
     
-    // 构造数据（日期自动取当前日期）
     const sleepData = {
-        date: new Date().toISOString().split('T')[0],  // 格式：YYYY-MM-DD
-        sleepTime: sleepTime,
-        wakeTime: wakeTime,
-        quality: quality
+        sleepTime,
+        wakeTime,
+        quality,
+        date: new Date().toISOString().split('T')[0]
     };
-  
-    // 使用 fetch() 将数据以 JSON 格式 POST 到后端 /sleep/record 接口
-    fetch('http://localhost:5000/sleep/record', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(sleepData)
-    })
-    .then(response => response.json())
-    .then(result => {
-        console.log('后台返回：', result);
-        if(result.message){
-            alert(result.message);
-            // 提交成功后更新图表
-            const stageData = generateSleepStageData(sleepTime, wakeTime, quality);
-            updateSleepStageChart(stageData);
-            updateSleepDisplay();
-        } else {
-            alert(result.error);
-        }
-        // 提交成功后关闭弹窗
-        closeSleepModal();
-    })
-    .catch(error => {
-        console.error('请求错误：', error);
-        alert('保存时出现错误');
-    });
+    
+    saveSleepData(sleepData);
+    alert('睡眠记录已保存');
+    closeSleepModal();
 }
 
 function openGoalModal() {
