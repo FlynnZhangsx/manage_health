@@ -72,3 +72,41 @@ CREATE TABLE IF NOT EXISTS heart (
     average_rate INT NOT NULL,  -- 平均心率值
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
+-- 新增
+-- 运动库表
+CREATE TABLE IF NOT EXISTS exercise_library (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(100) NOT NULL,
+    description TEXT,
+    muscle_group VARCHAR(50),
+    equipment VARCHAR(100),
+    difficulty VARCHAR(20),
+    instructions TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 营养记录表
+CREATE TABLE IF NOT EXISTS nutrition (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    date DATE NOT NULL,
+    food_name VARCHAR(100) NOT NULL,
+    calories INT NOT NULL,
+    protein FLOAT,
+    carbs FLOAT,
+    fat FLOAT,
+    meal_type VARCHAR(20),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 食物数据库表
+CREATE TABLE IF NOT EXISTS food_library (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(100) NOT NULL,
+    calories_per_100g INT NOT NULL,
+    protein_per_100g FLOAT,
+    carbs_per_100g FLOAT,
+    fat_per_100g FLOAT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+-- 新增
